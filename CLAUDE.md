@@ -115,9 +115,13 @@ licences of the models/libraries, and possible next steps (streaming, Persian AS
 
 ## Project report
 docs/Voice_Assistant_Project_Report.docx and .pdf are generated (git-ignored). Regenerate both when a step is
-finished. The .docx is built with docx-js (named styles "Code Block" / "Inline Code", screenshots embedded);
-the PDF is made from that .docx (mammoth -> HTML -> headless Chrome print-to-pdf), because Word on this
-machine is unactivated (reduced-functionality mode) and cannot save or export via COM.
+finished. Date format on the documents: Persian calendar in English, e.g. "Aban 1405".
+One content source feeds two renderers: docx-js for the .docx, and print-CSS HTML printed by headless Chrome
+for the PDF (two passes, so the table of contents has real page numbers). Word on this machine is unactivated
+(reduced-functionality mode) and cannot save or export via COM, so it is not part of the pipeline.
+Sections: summary with key numbers, overview, architecture (diagram + sequence), technology stack, phases,
+UI with screenshots, API, security, configuration, testing, performance, challenges (symptom / root cause /
+resolution / lesson), interview concepts (Q&A), limitations, licences, appendices.
 
 ## How to work
 - Steps: 1) project skeleton + /health, 2) ASR, 3) LLM, 4) TTS, 5) frontend polish, 6) README + tests.

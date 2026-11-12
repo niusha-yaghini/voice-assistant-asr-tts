@@ -233,7 +233,7 @@ curl -X POST http://127.0.0.1:8001/api/tts -H "Content-Type: application/json" \
 
 ## Performance
 
-Measured on a consumer desktop CPU (Windows 11, no GPU); your numbers will vary with hardware:
+Measured on an Intel Core i9-13900H laptop CPU (14 cores, 16 GB RAM, Windows 11, no GPU); your numbers will vary with hardware:
 
 | Step | Time |
 |---|---|
