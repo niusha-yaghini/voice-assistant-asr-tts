@@ -1,0 +1,23 @@
+__pycache__/
+.venv/
+.env
+.pytest_cache/
+
+# --- Project specific ---
+# Model weights (downloaded locally, never committed)
+models/
+*.onnx
+*.onnx.json
+*.bin
+*.safetensors
+
+# Generated / recorded audio
+*.wav
+*.webm
+*.mp3
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
