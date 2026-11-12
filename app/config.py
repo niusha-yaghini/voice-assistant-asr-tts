@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     llm_model: str = "Qwen/Qwen2.5-0.5B-Instruct"
     llm_system_prompt: str = "You are a helpful assistant. Answer in 1-3 short sentences."
     llm_max_new_tokens: int = 120
+    # Previous messages sent to the model (user + assistant). 12 = last 6 exchanges.
+    # Older turns are dropped to keep the prompt short and CPU latency low.
+    llm_max_history_messages: int = 12
 
     # TTS (Piper)
     piper_voice: str = "en_US-lessac-medium"

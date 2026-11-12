@@ -14,7 +14,13 @@ from fastapi.staticfiles import StaticFiles
 from app.asr import Transcriber
 from app.config import get_settings
 from app.llm import Responder
-from app.schemas import ChatRequest, ChatResponse, HealthResponse, TranscribeResponse
+from app.schemas import (
+    ChatMessage,
+    ChatRequest,
+    ChatResponse,
+    HealthResponse,
+    TranscribeResponse,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("voice_assistant")
@@ -111,18 +117,34 @@ def transcribe(request: Request, audio: UploadFile = File(...)) -> TranscribeRes
     return TranscribeResponse(text=text)
 
 
+def recent_history(history: list[ChatMessage], max_messages: int) -> list[dict[str, str]]:
+    """Keep only the newest ``max_messages`` non-empty turns, starting with a user turn.
+
+    Truncating bounds the prompt length (CPU latency grows with prompt size).
+    A leading assistant message without its question is dropped so the
+    conversation passed to the chat template stays well-formed.
+    """
+    turns = [m for m in history if m.content.strip()]
+    turns = turns[-max_messages:] if max_messages > 0 else []
+    while turns and turns[0].role != "user":
+        turns.pop(0)
+    return [{"role": m.role, "content": m.content.strip()} for m in turns]
+
+
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(payload: ChatRequest, request: Request) -> ChatResponse:
-    """Generate a short answer for the given text."""
+    """Generate a short answer for the given text, using earlier turns as context."""
+    settings = request.app.state.settings
     text = payload.text.strip()
-    max_chars = request.app.state.settings.max_text_chars
+    max_chars = settings.max_text_chars
     if not text:
         raise HTTPException(status_code=400, detail="Text is empty.")
     if len(text) > max_chars:
         raise HTTPException(status_code=400, detail=f"Text is longer than {max_chars} characters.")
 
+    history = recent_history(payload.history, settings.llm_max_history_messages)
     try:
-        answer = request.app.state.responder.answer(text)
+        answer = request.app.state.responder.answer(text, history)
     except Exception:
         logger.exception("Answer generation failed")
         raise HTTPException(status_code=500, detail="Answer generation failed. See server logs.")

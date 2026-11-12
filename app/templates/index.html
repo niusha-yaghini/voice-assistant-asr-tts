@@ -9,7 +9,15 @@
 <body>
   <main class="card">
     <h1>Local Voice Assistant</h1>
-    <p class="subtitle">Click the button, say one English sentence, click again to stop.</p>
+    <p class="subtitle">
+      Click the button, say one English sentence, click again to stop.
+      Follow-up questions keep the context of this conversation.
+    </p>
+
+    <section class="conversation" id="conversation" aria-label="Conversation" aria-live="polite" hidden>
+      <ol id="turns" class="turns"></ol>
+      <button id="reset-btn" class="link-btn" type="button">New conversation</button>
+    </section>
 
     <button id="record-btn" class="record-btn" type="button">
       <span class="dot" aria-hidden="true"></span>
@@ -18,16 +26,6 @@
 
     <p id="status" class="status" role="status" aria-live="polite"></p>
     <div id="error" class="error" role="alert" hidden></div>
-
-    <section class="block" id="transcript-block" hidden>
-      <h2>You said</h2>
-      <p id="transcript"></p>
-    </section>
-
-    <section class="block" id="answer-block" hidden>
-      <h2>Assistant</h2>
-      <p id="answer"></p>
-    </section>
   </main>
   <script src="/static/app.js"></script>
 </body>

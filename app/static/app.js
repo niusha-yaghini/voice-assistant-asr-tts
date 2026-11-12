@@ -1,16 +1,23 @@
 "use strict";
 
-/** Voice assistant frontend: record with MediaRecorder, upload, show transcript. */
+/**
+ * Voice assistant frontend: record with MediaRecorder, transcribe, ask the LLM.
+ *
+ * The conversation history lives only in this page (the `history` array) and is
+ * sent with every /api/chat request, so the server stays stateless. Reloading
+ * the page or clicking "New conversation" starts over.
+ */
 
 const recordBtn = document.getElementById("record-btn");
 const recordLabel = document.getElementById("record-label");
 const statusEl = document.getElementById("status");
 const errorEl = document.getElementById("error");
-const transcriptBlock = document.getElementById("transcript-block");
-const transcriptEl = document.getElementById("transcript");
-const answerBlock = document.getElementById("answer-block");
-const answerEl = document.getElementById("answer");
+const conversationEl = document.getElementById("conversation");
+const turnsEl = document.getElementById("turns");
+const resetBtn = document.getElementById("reset-btn");
 
+/** @type {{role: "user" | "assistant", content: string}[]} */
+let history = [];
 let mediaRecorder = null;
 let chunks = [];
 
@@ -26,6 +33,33 @@ function showError(message) {
 function clearError() {
   errorEl.hidden = true;
   errorEl.textContent = "";
+}
+
+/** Append one message bubble to the conversation and return it. */
+function addTurn(role, text) {
+  const item = document.createElement("li");
+  item.className = "turn turn-" + role;
+
+  const label = document.createElement("span");
+  label.className = "turn-label";
+  label.textContent = role === "user" ? "You" : "Assistant";
+
+  const body = document.createElement("p");
+  body.textContent = text; // textContent, never innerHTML: model output is untrusted
+
+  item.append(label, body);
+  turnsEl.append(item);
+  conversationEl.hidden = false;
+  item.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  return item;
+}
+
+function resetConversation() {
+  history = [];
+  turnsEl.replaceChildren();
+  conversationEl.hidden = true;
+  clearError();
+  setStatus("");
 }
 
 /** Pick a container/codec the current browser can record. */
@@ -83,12 +117,12 @@ async function requestJson(url, options) {
   return data;
 }
 
-/** Upload the recording, show the transcript, then ask the LLM and show its answer. */
+/** Upload the recording, show the transcript, then ask the LLM with the conversation so far. */
 async function handleRecording(blob) {
   recordBtn.disabled = true;
-  transcriptBlock.hidden = true;
-  answerBlock.hidden = true;
+  resetBtn.disabled = true;
   setStatus("Transcribing...");
+  let userTurn = null;
 
   try {
     const form = new FormData();
@@ -96,28 +130,30 @@ async function handleRecording(blob) {
     const { text } = await requestJson("/api/transcribe", { method: "POST", body: form });
 
     if (!text) {
-      transcriptEl.textContent = "(nothing was recognised)";
-      transcriptBlock.hidden = false;
-      setStatus("");
+      setStatus("Nothing was recognised. Please try again.");
       return;
     }
-    transcriptEl.textContent = text;
-    transcriptBlock.hidden = false;
+    userTurn = addTurn("user", text);
 
     setStatus("Thinking...");
     const { answer } = await requestJson("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, history }),
     });
-    answerEl.textContent = answer;
-    answerBlock.hidden = false;
+    addTurn("assistant", answer);
+
+    // Only a completed exchange becomes context for the next question.
+    history.push({ role: "user", content: text }, { role: "assistant", content: answer });
     setStatus("");
   } catch (err) {
+    if (userTurn) userTurn.remove(); // the question was not answered, so drop it
+    if (!turnsEl.children.length) conversationEl.hidden = true;
     showError(err.message);
     setStatus("");
   } finally {
     recordBtn.disabled = false;
+    resetBtn.disabled = false;
   }
 }
 
@@ -125,3 +161,5 @@ recordBtn.addEventListener("click", () => {
   if (mediaRecorder && mediaRecorder.state === "recording") stopRecording();
   else startRecording();
 });
+
+resetBtn.addEventListener("click", resetConversation);

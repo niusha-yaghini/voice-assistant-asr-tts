@@ -69,6 +69,50 @@ h2 { margin: 0 0 6px; font-size: 0.85rem; text-transform: uppercase; letter-spac
   background: rgba(248, 113, 113, 0.12);
 }
 
-.block { margin-top: 20px; }
-.block p { margin: 0; font-size: 1.1rem; line-height: 1.5; }
+.conversation { margin-bottom: 20px; }
+
+.turns {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 55vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.turn {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  line-height: 1.5;
+}
+.turn p { margin: 0; overflow-wrap: anywhere; }
+.turn-label { display: block; margin-bottom: 2px; font-size: 0.75rem; color: var(--muted); }
+
+.turn-user {
+  align-self: flex-end;
+  background: rgba(56, 189, 248, 0.16);
+  border-bottom-right-radius: 4px;
+}
+.turn-assistant {
+  align-self: flex-start;
+  background: rgba(148, 163, 184, 0.14);
+  border-bottom-left-radius: 4px;
+}
+
+.link-btn {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link-btn:hover { color: var(--text); }
+.link-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 [hidden] { display: none !important; }
