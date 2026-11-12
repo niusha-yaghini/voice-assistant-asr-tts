@@ -1,6 +1,8 @@
-# Step 1 (more added in later steps; pinned after confirming they install together)
+# Pinned after confirming they install together (more added in later steps)
 fastapi==0.162.5
 uvicorn[standard]==0.54.0
 pydantic-settings==2.15.0
 httpx==0.28.1
 pytest==9.2.0
+python-multipart==0.0.32
+faster-whisper==1.2.1

@@ -1,5 +1,29 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><title>Voice Assistant</title></head>
-<body><p>Voice assistant: frontend coming in step 5. Try <a href="/health">/health</a>.</p></body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Voice Assistant</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="card">
+    <h1>Local Voice Assistant</h1>
+    <p class="subtitle">Click the button, say one English sentence, click again to stop.</p>
+
+    <button id="record-btn" class="record-btn" type="button">
+      <span class="dot" aria-hidden="true"></span>
+      <span id="record-label">Start recording</span>
+    </button>
+
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <div id="error" class="error" role="alert" hidden></div>
+
+    <section class="block" id="transcript-block" hidden>
+      <h2>You said</h2>
+      <p id="transcript"></p>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
 </html>

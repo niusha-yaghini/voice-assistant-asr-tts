@@ -1,16 +1,19 @@
 """FastAPI application: lifespan (model loading) and routes."""
 
+import io
 import logging
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from av.error import InvalidDataError
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.asr import Transcriber
 from app.config import get_settings
-from app.schemas import HealthResponse
+from app.schemas import HealthResponse, TranscribeResponse
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("voice_assistant")
@@ -30,8 +33,16 @@ async def lifespan(app: FastAPI):
     app.state.settings = get_settings()
     app.state.models_loaded = False
 
+    cfg = app.state.settings
     started = time.perf_counter()
-    # Models are added here in the next steps (ASR, LLM, TTS).
+
+    t0 = time.perf_counter()
+    app.state.transcriber = Transcriber(
+        cfg.whisper_model, cfg.whisper_device, cfg.whisper_compute_type
+    )
+    logger.info("ASR model '%s' loaded in %.2fs", cfg.whisper_model, time.perf_counter() - t0)
+
+    # LLM and TTS are added here in the next steps.
     logger.info("Startup finished in %.2fs", time.perf_counter() - started)
     app.state.models_loaded = True
 
@@ -56,3 +67,25 @@ def health(request: Request) -> HealthResponse:
 def index() -> FileResponse:
     """Serve the single-page frontend (added in step 5)."""
     return FileResponse(TEMPLATES_DIR / "index.html")
+
+
+@app.post("/api/transcribe", response_model=TranscribeResponse)
+def transcribe(request: Request, audio: UploadFile = File(...)) -> TranscribeResponse:
+    """Transcribe an uploaded recording. Plain ``def`` so FastAPI uses its threadpool."""
+    max_bytes = request.app.state.settings.max_audio_bytes
+    data = audio.file.read(max_bytes + 1)  # read one extra byte to detect oversize
+    if not data:
+        raise HTTPException(status_code=400, detail="Audio file is empty.")
+    if len(data) > max_bytes:
+        raise HTTPException(
+            status_code=400, detail=f"Audio file is larger than {max_bytes // (1024 * 1024)} MB."
+        )
+
+    try:
+        text = request.app.state.transcriber.transcribe(io.BytesIO(data))
+    except InvalidDataError:
+        raise HTTPException(status_code=400, detail="Could not decode the audio file.")
+    except Exception:
+        logger.exception("Transcription failed")
+        raise HTTPException(status_code=500, detail="Transcription failed. See server logs.")
+    return TranscribeResponse(text=text)
