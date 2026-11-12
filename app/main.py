@@ -8,7 +8,7 @@ from pathlib import Path
 
 from av.error import InvalidDataError
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.asr import Transcriber
@@ -20,12 +20,15 @@ from app.schemas import (
     ChatResponse,
     HealthResponse,
     TranscribeResponse,
+    TTSRequest,
 )
+from app.tts import Synthesizer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("voice_assistant")
 
 BASE_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = BASE_DIR.parent
 STATIC_DIR = BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
 
@@ -55,7 +58,14 @@ async def lifespan(app: FastAPI):
     )
     logger.info("LLM '%s' loaded in %.2fs", cfg.llm_model, time.perf_counter() - t0)
 
-    # TTS is added here in the next step.
+    t0 = time.perf_counter()
+    voice_dir = Path(cfg.piper_model_dir)
+    if not voice_dir.is_absolute():
+        voice_dir = PROJECT_DIR / voice_dir  # independent of the working directory
+    app.state.synthesizer = Synthesizer(voice_dir, cfg.piper_voice)
+    app.state.synthesizer.warm_up()
+    logger.info("TTS voice '%s' loaded in %.2fs", cfg.piper_voice, time.perf_counter() - t0)
+
     logger.info("Startup finished in %.2fs", time.perf_counter() - started)
     app.state.models_loaded = True
 
@@ -149,3 +159,27 @@ def chat(payload: ChatRequest, request: Request) -> ChatResponse:
         logger.exception("Answer generation failed")
         raise HTTPException(status_code=500, detail="Answer generation failed. See server logs.")
     return ChatResponse(answer=answer)
+
+
+@app.post(
+    "/api/tts",
+    response_class=Response,
+    responses={200: {"content": {"audio/wav": {}}, "description": "WAV audio (16-bit PCM, mono)"}},
+)
+def tts(payload: TTSRequest, request: Request) -> Response:
+    """Convert text (normally one assistant answer) to speech and return WAV bytes."""
+    text = payload.text.strip()
+    max_chars = request.app.state.settings.max_tts_chars
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is empty.")
+    if len(text) > max_chars:
+        raise HTTPException(status_code=400, detail=f"Text is longer than {max_chars} characters.")
+
+    try:
+        wav_bytes = request.app.state.synthesizer.synthesize(text)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception:
+        logger.exception("Speech synthesis failed")
+        raise HTTPException(status_code=500, detail="Speech synthesis failed. See server logs.")
+    return Response(content=wav_bytes, media_type="audio/wav")

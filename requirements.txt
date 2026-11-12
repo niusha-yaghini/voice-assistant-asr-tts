@@ -10,3 +10,4 @@ python-multipart==0.0.32
 faster-whisper==1.2.1
 torch==2.14.1
 transformers==5.20.2
+piper-tts==1.8.0

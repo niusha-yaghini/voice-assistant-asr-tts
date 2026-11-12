@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     # Validation limits
     max_audio_bytes: int = 10 * 1024 * 1024
     max_text_chars: int = 500
+    # TTS reads LLM answers back; 120 new tokens can exceed 500 chars, so allow more here.
+    max_tts_chars: int = 1000
 
 
 @lru_cache

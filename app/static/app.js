@@ -48,13 +48,96 @@ function addTurn(role, text) {
   body.textContent = text; // textContent, never innerHTML: model output is untrusted
 
   item.append(label, body);
+  if (role === "assistant") item.append(createPlayButton(text));
   turnsEl.append(item);
   conversationEl.hidden = false;
   item.scrollIntoView({ behavior: "smooth", block: "nearest" });
   return item;
 }
 
+// ---------- Text-to-speech playback ----------
+
+/** The single shared player: only one answer plays at a time. */
+const player = new Audio();
+/** Button of the answer that is currently loading or playing. */
+let activeButton = null;
+/** WAV object URLs per answer button, so replaying does not call the server again. */
+const audioCache = new WeakMap();
+
+function setPlayState(button, state) {
+  const labels = { idle: "▶ Play", loading: "… Loading", playing: "■ Stop" };
+  button.dataset.state = state;
+  button.textContent = labels[state];
+  button.setAttribute("aria-label", state === "playing" ? "Stop playback" : "Play this answer");
+}
+
+function stopPlayback() {
+  player.pause();
+  player.currentTime = 0;
+  if (activeButton) setPlayState(activeButton, "idle");
+  activeButton = null;
+}
+
+/** Fetch (once) and play the speech for one answer; clicking again stops it. */
+async function togglePlayback(button, text) {
+  if (activeButton === button) {
+    stopPlayback(); // second click on the same answer = stop
+    return;
+  }
+  stopPlayback();
+  clearError();
+  activeButton = button;
+
+  try {
+    let url = audioCache.get(button);
+    if (!url) {
+      setPlayState(button, "loading");
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || "Speech request failed (" + response.status + ")");
+      }
+      url = URL.createObjectURL(await response.blob());
+      audioCache.set(button, url);
+    }
+    if (activeButton !== button) return; // another answer was clicked while loading
+
+    player.src = url;
+    setPlayState(button, "playing");
+    await player.play();
+  } catch (err) {
+    if (activeButton === button) {
+      setPlayState(button, "idle");
+      activeButton = null;
+    }
+    showError(err.message);
+  }
+}
+
+player.addEventListener("ended", () => {
+  if (activeButton) setPlayState(activeButton, "idle");
+  activeButton = null;
+});
+
+function createPlayButton(text) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "play-btn";
+  setPlayState(button, "idle");
+  button.addEventListener("click", () => togglePlayback(button, text));
+  return button;
+}
+
 function resetConversation() {
+  stopPlayback();
+  turnsEl.querySelectorAll(".play-btn").forEach((button) => {
+    const url = audioCache.get(button);
+    if (url) URL.revokeObjectURL(url); // free the WAV blobs of the old conversation
+  });
   history = [];
   turnsEl.replaceChildren();
   conversationEl.hidden = true;
@@ -70,6 +153,7 @@ function pickMimeType() {
 
 async function startRecording() {
   clearError();
+  stopPlayback(); // don't record the assistant's own voice
   if (!navigator.mediaDevices || !window.MediaRecorder) {
     showError("Your browser does not support audio recording.");
     return;

@@ -40,6 +40,12 @@ class ChatRequest(BaseModel):
     history: list[ChatMessage] = Field(default_factory=list)
 
 
+class TTSRequest(BaseModel):
+    """Request body of POST /api/tts."""
+
+    text: str
+
+
 class ChatResponse(BaseModel):
     """Response of POST /api/chat."""
 
