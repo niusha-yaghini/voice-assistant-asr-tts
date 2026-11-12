@@ -21,3 +21,6 @@ models/
 .idea/
 .DS_Store
 Thumbs.db
+# Generated reports (Word/PDF, kept out of git)
+docs/*.docx
+docs/*.pdf
