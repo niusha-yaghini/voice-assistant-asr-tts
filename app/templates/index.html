@@ -2,31 +2,99 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Local Voice Assistant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="A local voice assistant: speech-to-text, a small LLM and text-to-speech, all open-source and running on CPU.">
+  <title>Voice Assistant</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236366f1'/%3E%3Cstop offset='1' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M9 13v6M13 10v12M17 8v16M21 11v10M25 14v4' stroke='white' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <main class="card">
-    <h1>Local Voice Assistant</h1>
-    <p class="subtitle">
-      Click the button, say one English sentence, click again to stop.
-      Follow-up questions keep the context of this conversation.
-    </p>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M5 10v4M9 7v10M13 5v14M17 8v8M21 11v2"/></svg>
+        </span>
+        <div class="brand-text">
+          <h1>Voice Assistant</h1>
+          <p>Local · Open-source · CPU</p>
+        </div>
+      </div>
 
-    <section class="conversation" id="conversation" aria-label="Conversation" aria-live="polite" hidden>
-      <ol id="turns" class="turns"></ol>
-      <button id="reset-btn" class="link-btn" type="button">New conversation</button>
-    </section>
+      <div class="topbar-actions">
+        <span id="health" class="pill" data-state="loading" role="status">
+          <span class="pill-dot" aria-hidden="true"></span>
+          <span id="health-label">Connecting…</span>
+        </span>
+        <button id="reset-btn" class="ghost-btn" type="button" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span>New chat</span>
+        </button>
+      </div>
+    </header>
 
-    <button id="record-btn" class="record-btn" type="button">
-      <span class="dot" aria-hidden="true"></span>
-      <span id="record-label">Start recording</span>
-    </button>
+    <main id="chat" class="chat">
+      <div class="chat-inner">
+        <section id="empty" class="empty">
+          <div class="empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4M8 21h8"/></svg>
+          </div>
+          <h2>Ask me anything</h2>
+          <p class="empty-lead">
+            Press the microphone and speak one English sentence.
+            Follow-up questions keep the context of the conversation.
+          </p>
 
-    <p id="status" class="status" role="status" aria-live="polite"></p>
-    <div id="error" class="error" role="alert" hidden></div>
-  </main>
+          <div class="suggestions" aria-label="Example questions">
+            <button class="chip" type="button">What is the capital of France?</button>
+            <button class="chip" type="button">Explain what a CPU does.</button>
+            <button class="chip" type="button">Give me one tip for a job interview.</button>
+          </div>
+
+          <ol class="pipeline" aria-label="How it works">
+            <li>
+              <span class="pipeline-step">1</span>
+              <div><strong>Speech-to-text</strong><span>Whisper base.en · int8</span></div>
+            </li>
+            <li>
+              <span class="pipeline-step">2</span>
+              <div><strong>Answer</strong><span>Qwen2.5 0.5B Instruct</span></div>
+            </li>
+            <li>
+              <span class="pipeline-step">3</span>
+              <div><strong>Text-to-speech</strong><span>Piper · lessac medium</span></div>
+            </li>
+          </ol>
+        </section>
+
+        <ol id="turns" class="turns" aria-live="polite" aria-label="Conversation"></ol>
+      </div>
+    </main>
+
+    <footer class="dock">
+      <div class="dock-inner">
+        <div id="error" class="error" role="alert" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>
+          <span id="error-text"></span>
+          <button id="error-close" class="icon-btn" type="button" aria-label="Dismiss error">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+
+        <div class="recorder">
+          <canvas id="wave" class="wave" aria-hidden="true"></canvas>
+          <button id="record-btn" class="mic-btn" type="button" aria-label="Start recording">
+            <svg class="icon-mic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>
+            <svg class="icon-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+        </div>
+        <p id="status" class="status" aria-live="polite"></p>
+      </div>
+    </footer>
+  </div>
+
   <script src="/static/app.js"></script>
 </body>
 </html>
