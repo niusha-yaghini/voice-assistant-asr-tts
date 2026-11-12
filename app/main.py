@@ -13,7 +13,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.asr import Transcriber
 from app.config import get_settings
-from app.schemas import HealthResponse, TranscribeResponse
+from app.llm import Responder
+from app.schemas import ChatRequest, ChatResponse, HealthResponse, TranscribeResponse
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("voice_assistant")
@@ -42,7 +43,13 @@ async def lifespan(app: FastAPI):
     )
     logger.info("ASR model '%s' loaded in %.2fs", cfg.whisper_model, time.perf_counter() - t0)
 
-    # LLM and TTS are added here in the next steps.
+    t0 = time.perf_counter()
+    app.state.responder = Responder(
+        cfg.llm_model, cfg.llm_system_prompt, cfg.llm_max_new_tokens
+    )
+    logger.info("LLM '%s' loaded in %.2fs", cfg.llm_model, time.perf_counter() - t0)
+
+    # TTS is added here in the next step.
     logger.info("Startup finished in %.2fs", time.perf_counter() - started)
     app.state.models_loaded = True
 
@@ -57,6 +64,19 @@ STATIC_DIR.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+@app.middleware("http")
+async def revalidate_frontend(request: Request, call_next):
+    """Make browsers revalidate the page and static files so edits show up immediately.
+
+    ``no-cache`` still allows caching, but the browser must check the ETag /
+    Last-Modified with the server first (cheap 304 if nothing changed).
+    """
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.get("/health", response_model=HealthResponse)
 def health(request: Request) -> HealthResponse:
     """Report liveness and whether all models finished loading."""
@@ -65,7 +85,7 @@ def health(request: Request) -> HealthResponse:
 
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
-    """Serve the single-page frontend (added in step 5)."""
+    """Serve the single-page frontend."""
     return FileResponse(TEMPLATES_DIR / "index.html")
 
 
@@ -89,3 +109,21 @@ def transcribe(request: Request, audio: UploadFile = File(...)) -> TranscribeRes
         logger.exception("Transcription failed")
         raise HTTPException(status_code=500, detail="Transcription failed. See server logs.")
     return TranscribeResponse(text=text)
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+def chat(payload: ChatRequest, request: Request) -> ChatResponse:
+    """Generate a short answer for the given text."""
+    text = payload.text.strip()
+    max_chars = request.app.state.settings.max_text_chars
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is empty.")
+    if len(text) > max_chars:
+        raise HTTPException(status_code=400, detail=f"Text is longer than {max_chars} characters.")
+
+    try:
+        answer = request.app.state.responder.answer(text)
+    except Exception:
+        logger.exception("Answer generation failed")
+        raise HTTPException(status_code=500, detail="Answer generation failed. See server logs.")
+    return ChatResponse(answer=answer)

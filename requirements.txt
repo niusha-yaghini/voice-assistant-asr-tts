@@ -1,4 +1,6 @@
-# Pinned after confirming they install together (more added in later steps)
+# Pinned after confirming they install together (more added in later steps).
+# Install the CPU-only torch build FIRST (see README):
+#   pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
 fastapi==0.162.5
 uvicorn[standard]==0.54.0
 pydantic-settings==2.15.0
@@ -6,3 +8,5 @@ httpx==0.28.1
 pytest==9.2.0
 python-multipart==0.0.32
 faster-whisper==1.2.1
+torch==2.14.1
+transformers==5.20.2

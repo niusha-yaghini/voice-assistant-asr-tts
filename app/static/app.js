@@ -8,6 +8,8 @@ const statusEl = document.getElementById("status");
 const errorEl = document.getElementById("error");
 const transcriptBlock = document.getElementById("transcript-block");
 const transcriptEl = document.getElementById("transcript");
+const answerBlock = document.getElementById("answer-block");
+const answerEl = document.getElementById("answer");
 
 let mediaRecorder = null;
 let chunks = [];
@@ -73,21 +75,43 @@ function stopRecording() {
   recordLabel.textContent = "Start recording";
 }
 
-/** Upload the recording and display the transcript. */
+/** Send a request and return parsed JSON, throwing the server's error message on failure. */
+async function requestJson(url, options) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || "Request failed (" + response.status + ")");
+  return data;
+}
+
+/** Upload the recording, show the transcript, then ask the LLM and show its answer. */
 async function handleRecording(blob) {
   recordBtn.disabled = true;
   transcriptBlock.hidden = true;
+  answerBlock.hidden = true;
   setStatus("Transcribing...");
 
   try {
     const form = new FormData();
     form.append("audio", blob, "recording." + (blob.type.includes("ogg") ? "ogg" : "webm"));
-    const response = await fetch("/api/transcribe", { method: "POST", body: form });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.detail || "Request failed (" + response.status + ")");
+    const { text } = await requestJson("/api/transcribe", { method: "POST", body: form });
 
-    transcriptEl.textContent = data.text || "(nothing was recognised)";
+    if (!text) {
+      transcriptEl.textContent = "(nothing was recognised)";
+      transcriptBlock.hidden = false;
+      setStatus("");
+      return;
+    }
+    transcriptEl.textContent = text;
     transcriptBlock.hidden = false;
+
+    setStatus("Thinking...");
+    const { answer } = await requestJson("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    answerEl.textContent = answer;
+    answerBlock.hidden = false;
     setStatus("");
   } catch (err) {
     showError(err.message);
