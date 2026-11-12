@@ -280,3 +280,5 @@ This project uses third-party models and libraries under their own licences. Che
 | piper-tts (1.8) | **GPL-3.0-or-later** |
 | Piper voice `en_US-lessac-medium` | See the voice's [model card](https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US/lessac/medium) |
 | FastAPI | MIT |
+
+python -m uvicorn app.main:app --reload --port 8001
